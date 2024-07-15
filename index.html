@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meditation Tracker</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #f0f0f0;
+            --primary-color: #2980b9;
+            --secondary-color: #27ae60;
+            --accent-color: #c0392b;
+        }
+        
+        .container {
+            background-color: var(--bg-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-color);
+        }
+        
+        input, select, button, textarea {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--text-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .session-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .session-button {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .session-button.completed {
+            background-color: var(--secondary-color);
+            color: var(--bg-color);
+        }
+        
+        .notes-icon {
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        
+        .weekly-overview {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .day-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: var(--bg-color);
+            border: 1px solid var(--text-color);
+        }
+        
+        .day-circle.completed {
+            background-color: var(--secondary-color);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: var(--bg-color);
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid var(--text-color);
+            width: 80%;
+            max-width: 500px;
+        }
+        
+        .close {
+            color: var(--text-color);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        #theme-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <button id="theme-toggle">Toggle Theme</button>
+
+    <div class="container" id="setup">
+        <h1>Meditation Tracker Setup</h1>
+        <input type="text" id="mandalaName" placeholder="Enter Mandala Name/Intention">
+        <select id="duration">
+            <option value="48">48 days (2 sessions/day)</option>
+            <option value="90">90 days (1 session/day)</option>
+        </select>
+        <input type="date" id="startDate">
+        <button onclick="setupTracker()">Start Tracker</button>
+    </div>
+
+    <div class="container" id="dashboard" style="display:none;">
+        <h2 id="mandalaTitle"></h2>
+        <p>Start Date: <span id="startDateDisplay"></span></p>
+        <p>End Date: <span id="endDateDisplay"></span></p>
+        <p>Progress: <span id="progressDisplay"></span></p>
+        <p>Current Streak: <span id="streakDisplay"></span> days</p>
+        <p>Current Day: Day <span id="currentDayDisplay"></span></p>
+        <button onclick="exportData()">Export Data</button>
+    </div>
+
+    <div class="container" id="tracker" style="display:none;"></div>
+
+    <div class="container" id="weeklyOverview" style="display:none;"></div>
+
+    <div class="container" id="stats" style="display:none;">
+        <h2>Detailed Statistics</h2>
+        <div id="statsContainer"></div>
+    </div>
+
+    <div class="container" id="guidedMeditation" style="display:none;">
+        <h2>Guided Meditation of the Day</h2>
+        <p id="meditationPrompt"></p>
+        <audio id="meditationAudio" controls>
+            <source src="" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
+
+    <button onclick="shareProgress()" style="display:none;" id="shareButton">Share Progress</button>
+
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Session Notes</h2>
+            <textarea id="sessionNotes" rows="4" cols="50"></textarea>
+            <button onclick="saveNotes()">Save Notes</button>
+        </div>
+    </div>
+
+    <script>
+        let trackerData = {
+            mandalaName: '',
+            duration: 48,
+            startDate: null,
+            endDate: null,
+            sessions: [],
+            themeColor: '#2ecc71'
+        };
+
+        function setupTracker() {
+            trackerData.mandalaName = document.getElementById('mandalaName').value;
+            trackerData.duration = parseInt(document.getElementById('duration').value);
+            trackerData.startDate = new Date(document.getElementById('startDate').value);
+            trackerData.endDate = new Date(trackerData.startDate);
+            trackerData.endDate.setDate(trackerData.endDate.getDate() + trackerData.duration - 1);
+
+            trackerData.sessions = Array(trackerData.duration * 2).fill().map(() => ({
+                completed: false,
+                notes: ''
+            }));
+
+            updateDashboard();
+            generateTracker();
+            updateWeeklyOverview();
+            updateDetailedStats();
+            updateGuidedMeditation();
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('tracker').style.display = 'block';
+            document.getElementById('weeklyOverview').style.display = 'block';
+            document.getElementById('stats').style.display = 'block';
+            document.getElementById('guidedMeditation').style.display = 'block';
+            document.getElementById('shareButton').style.display = 'block';
+
+            saveToLocalStorage();
+            setDailyReminder();
+        }
+
+        function generateTracker() {
+            const tracker = document.getElementById('tracker');
+            tracker.innerHTML = '';
+
+            for (let i = 0; i < trackerData.duration; i++) {
+                const row = document.createElement('div');
+                row.className = 'session-row';
+                const date = new Date(trackerData.startDate);
+                date.setDate(date.getDate() + i);
+
+                row.innerHTML = `
+                    <span>Day ${i + 1} [${date.toLocaleDateString()}]: </span>
+                    <div>
+                        <button class="session-button" onclick="toggleSession(${i * 2})">M</button>
+                        <span class="notes-icon" onclick="openNotesModal(${i * 2})">📝</span>
+                        <button class="session-button" onclick="toggleSession(${i * 2 + 1})">E</button>
+                        <span class="notes-icon" onclick="openNotesModal(${i * 2 + 1})">📝</span>
+                    </div>
+                `;
+
+                tracker.appendChild(row);
+            }
+
+            updateSessionDisplay();
+        }
+
+        function toggleSession(index) {
+            trackerData.sessions[index].completed = !trackerData.sessions[index].completed;
+            updateSessionDisplay();
+            updateDashboard();
+            updateWeeklyOverview();
+            updateDetailedStats();
+            checkMilestones();
+            saveToLocalStorage();
+        }
+
+        function updateSessionDisplay() {
+            const buttons = document.querySelectorAll('.session-button');
+            buttons.forEach((button, index) => {
+                button.classList.toggle('completed', trackerData.sessions[index].completed);
+            });
+        }
+
+        function updateDashboard() {
+            document.getElementById('mandalaTitle').textContent = trackerData.mandalaName;
+            document.getElementById('startDateDisplay').textContent = trackerData.startDate.toLocaleDateString();
+            document.getElementById('endDateDisplay').textContent = trackerData.endDate.toLocaleDateString();
+
+            const completedSessions = trackerData.sessions.filter(s => s.completed).length;
+            const totalSessions = trackerData.sessions.length;
+            const completedDays = Math.floor(completedSessions / 2);
+            const totalDays = trackerData.duration;
+
+            document.getElementById('progressDisplay').textContent = 
+                `${completedSessions}/${totalSessions} sessions (${completedDays}/${totalDays} days)`;
+
+            const currentStreak = calculateStreak();
+            document.getElementById('streakDisplay').textContent = currentStreak;
+
+            const currentDay = Math.min(Math.ceil((new Date() - trackerData.startDate) / (1000 * 60 * 60 * 24)), trackerData.duration);
+            document.getElementById('currentDayDisplay').textContent = currentDay;
+        }
+
+        function calculateStreak() {
+            let streak = 0;
+            for (let i = trackerData.sessions.length - 2; i >= 0; i -= 2) {
+                if (trackerData.sessions[i].completed && trackerData.sessions[i + 1].completed) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            return streak;
+        }
+
+        function updateWeeklyOverview() {
+            const weeklyOverview = document.getElementById('weeklyOverview');
+            weeklyOverview.innerHTML = '<h2>Weekly Overview</h2>';
+
+            for (let i = 0; i < trackerData.duration; i += 7) {
+                const weekDiv = document.createElement('div');
+                weekDiv.className = 'week';
+
+                for (let j = i; j < Math.min(i + 7, trackerData.duration); j++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'day-circle';
+                    if (trackerData.sessions[j * 2].completed && trackerData.sessions[j * 2 + 1].completed) {
+                        dayDiv.classList.add('completed');
+                    }
+                    weekDiv.appendChild(dayDiv);
+                }
+
+                weeklyOverview.appendChild(weekDiv);
+            }
+        }
+
+        function openNotesModal(index) {
+            const modal = document.getElementById('notesModal');
+            const textarea = document.getElementById('sessionNotes');
+            textarea.value = trackerData.sessions[index].notes;
+            modal.style.display = 'block';
+            modal.dataset.sessionIndex = index;
+        }
+
+        function saveNotes() {
+            const modal = document.getElementById('notesModal');
+            const index = parseInt(modal.dataset.sessionIndex);
+            const textarea = document.getElementById('sessionNotes');
+            trackerData.sessions[index].notes = textarea.value;
+            modal.style.display = 'none';
+            saveToLocalStorage();
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trackerData));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "meditation_tracker_data.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function updateDetailedStats() {
+            const statsContainer = document.getElementById('statsContainer');
+            statsContainer.innerHTML = '';
+
+            const totalSessions = trackerData.sessions.length;
+            const completedSessions = trackerData.sessions.filter(s => s.completed).length;
+            const completionRate = (completedSessions / totalSessions * 100).toFixed(2);
+
+            const morningCompletions = trackerData.sessions.filter((s, i) => i % 2 === 0 && s.completed).length;
+            const eveningCompletions = trackerData.sessions.filter((s, i) => i % 2 !== 0 && s.completed).length;
+
+            const stats = [
+                { label: 'Completion Rate', value: `${completionRate}%` },
+                { label: 'Morning Sessions', value: morningCompletions },
+                { label: 'Evening Sessions', value: eveningCompletions },
+                { label: 'Longest Streak', value: calculateLongestStreak() }
+            ];
+
+            stats.forEach(stat => {
+                const statBox = document.createElement('div');
+                statBox.innerHTML = `<h3>${stat.label}</h3><p>${stat.value}</p>`;
+                statsContainer.appendChild(statBox);
+            });
+        }
+
+       function calculateLongestStreak() {
+        let currentStreak = 0;
+        let longestStreak = 0;
+
+        for (let i = 0; i < trackerData.sessions.length; i += 2) {
+            if (trackerData.sessions[i].completed && trackerData.sessions[i + 1].completed) {
+                currentStreak++;
+                longestStreak = Math.max(longestStreak, currentStreak);
+            } else {
+                currentStreak = 0;
+            }
+        }
+
+        return longestStreak;
+    }
+
+    function checkMilestones() {
+        const completedSessions = trackerData.sessions.filter(s => s.completed).length;
+        const milestones = [
+            { threshold: 7, message: "You've completed your first week! Keep up the great work!" },
+            { threshold: 30, message: "30 days of meditation! You're building a fantastic habit." },
+            { threshold: 60, message: "60 days! Your dedication is truly inspiring." },
+            { threshold: 90, message: "90 days of consistent practice! You're a meditation master!" }
+        ];
+
+        const achievedMilestone = milestones.find(m => completedSessions === m.threshold * 2);
+        if (achievedMilestone) {
+            alert(achievedMilestone.message);
+        }
+    }
+
+    function updateGuidedMeditation() {
+        const prompts = [
+            "Focus on your breath, feeling the rise and fall of your chest.",
+            "Scan your body from head to toe, releasing tension as you go.",
+            "Visualize a peaceful place and immerse yourself in the details.",
+            "Practice loving-kindness meditation, sending good wishes to others.",
+            "Observe your thoughts without judgment, letting them pass like clouds."
+        ];
+
+        const audioFiles = [
+            "meditation1.mp3",
+            "meditation2.mp3",
+            "meditation3.mp3",
+            "meditation4.mp3",
+            "meditation5.mp3"
+        ];
+
+        const index = Math.floor(Math.random() * prompts.length);
+        document.getElementById('meditationPrompt').textContent = prompts[index];
+        document.getElementById('meditationAudio').src = audioFiles[index];
+    }
+
+    function shareProgress() {
+        const completedSessions = trackerData.sessions.filter(s => s.completed).length;
+        const totalSessions = trackerData.sessions.length;
+        const shareText = `I've completed ${completedSessions} out of ${totalSessions} meditation sessions in my "${trackerData.mandalaName}" practice! #MeditationChallenge`;
+        
+        // This is a simple implementation. In a real-world scenario, you'd integrate with social media APIs.
+        alert("Sharing: " + shareText);
+    }
+
+    function setDailyReminder() {
+        if ("Notification" in window) {
+            Notification.requestPermission().then(function (permission) {
+                if (permission === "granted") {
+                    // This is a simple implementation. In a real-world scenario, you'd use a service worker for more reliable notifications.
+                    setInterval(() => {
+                        const now = new Date();
+                        if (now.getHours() === 8) { // Morning reminder at 8 AM
+                            new Notification("Meditation Reminder", { body: "Time for your morning meditation session!" });
+                        } else if (now.getHours() === 20) { // Evening reminder at 8 PM
+                            new Notification("Meditation Reminder", { body: "Time for your evening meditation session!" });
+                        }
+                    }, 3600000); // Check every hour
+                }
+            });
+        }
+    }
+
+    function saveToLocalStorage() {
+        localStorage.setItem('meditationTrackerData', JSON.stringify(trackerData));
+    }
+
+    function loadFromLocalStorage() {
+        const savedData = localStorage.getItem('meditationTrackerData');
+        if (savedData) {
+            trackerData = JSON.parse(savedData);
+            trackerData.startDate = new Date(trackerData.startDate);
+            trackerData.endDate = new Date(trackerData.endDate);
+            updateDashboard();
+            generateTracker();
+            updateWeeklyOverview();
+            updateDetailedStats();
+            updateGuidedMeditation();
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('tracker').style.display = 'block';
+            document.getElementById('weeklyOverview').style.display = 'block';
+            document.getElementById('stats').style.display = 'block';
+            document.getElementById('guidedMeditation').style.display = 'block';
+            document.getElementById('shareButton').style.display = 'block';
+        }
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-mode');
+        saveToLocalStorage();
+    }
+
+    // Event listeners
+    document.querySelector('.close').onclick = function() {
+        document.getElementById('notesModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('notesModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+    // Initialize the application
+    loadFromLocalStorage();
+    if (!trackerData.startDate) {
+        document.getElementById('startDate').valueAsDate = new Date();
+    }
+</script>
+  </body>
+    
+  </html>
